@@ -1,0 +1,33 @@
+[Unit]
+Description=My Backend API Service
+Documentation=https://example.com/docs
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=app
+Group=app
+WorkingDirectory=/opt/myapp
+ExecStart=/opt/myapp/bin/server --config /etc/myapp/config.yaml
+Restart=on-failure
+RestartSec=5s
+
+Environment="APP_ENV=production"
+Environment="PORT=8080"
+EnvironmentFile=-/etc/myapp/environment
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=myapp
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/myapp
+
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
