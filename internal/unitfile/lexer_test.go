@@ -14,13 +14,14 @@ type tok struct {
 	col  int
 }
 
-func readFixture(t *testing.T, name string) []byte {
+func readFixture(t *testing.T, name string) (string, []byte) {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", "rules", name))
+	path := filepath.Join("..", "..", "testdata", "rules", name)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("reading fixture %s: %v", name, err)
 	}
-	return data
+	return path, data
 }
 
 func assertTokens(t *testing.T, got []Token, want []tok) {
@@ -38,8 +39,8 @@ func assertTokens(t *testing.T, got []Token, want []tok) {
 }
 
 func TestLexContinuation(t *testing.T) {
-	src := readFixture(t, "continuation.service")
-	toks, errs := Lex(src)
+	file, src := readFixture(t, "continuation.service")
+	toks, errs := Lex(file, src)
 	if len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
@@ -57,16 +58,16 @@ func TestLexContinuation(t *testing.T) {
 }
 
 func TestLexContinuationAtEOF(t *testing.T) {
-	src := readFixture(t, "continuation-eof.service")
-	_, errs := Lex(src)
+	file, src := readFixture(t, "continuation-eof.service")
+	_, errs := Lex(file, src)
 	if len(errs) == 0 {
 		t.Fatal("expected an error for dangling continuation at EOF, got none")
 	}
 }
 
 func TestLexSpacedKV(t *testing.T) {
-	src := readFixture(t, "spaced-kv.service")
-	toks, errs := Lex(src)
+	file, src := readFixture(t, "spaced-kv.service")
+	toks, errs := Lex(file, src)
 	if len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
@@ -92,8 +93,8 @@ func TestLexSpacedKV(t *testing.T) {
 }
 
 func TestLexMalformedKeyRecovers(t *testing.T) {
-	src := readFixture(t, "malformed-key.service")
-	toks, errs := Lex(src)
+	file, src := readFixture(t, "malformed-key.service")
+	toks, errs := Lex(file, src)
 	if len(errs) != 1 {
 		t.Fatalf("expected exactly 1 error, got %d: %v", len(errs), errs)
 	}
@@ -113,8 +114,8 @@ func TestLexMalformedKeyRecovers(t *testing.T) {
 }
 
 func TestLexUnterminatedSectionRecovers(t *testing.T) {
-	src := readFixture(t, "unterminated-section.service")
-	toks, errs := Lex(src)
+	file, src := readFixture(t, "unterminated-section.service")
+	toks, errs := Lex(file, src)
 	if len(errs) != 1 {
 		t.Fatalf("expected exactly 1 error, got %d: %v", len(errs), errs)
 	}
@@ -134,8 +135,8 @@ func TestLexUnterminatedSectionRecovers(t *testing.T) {
 }
 
 func TestLexBlankAndComments(t *testing.T) {
-	src := readFixture(t, "blank-and-comments.service")
-	toks, errs := Lex(src)
+	file, src := readFixture(t, "blank-and-comments.service")
+	toks, errs := Lex(file, src)
 	if len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
@@ -166,8 +167,8 @@ func TestLexBlankAndComments(t *testing.T) {
 }
 
 func TestLexNoTrailingNewline(t *testing.T) {
-	src := readFixture(t, "no-trailing-newline.service")
-	toks, errs := Lex(src)
+	file, src := readFixture(t, "no-trailing-newline.service")
+	toks, errs := Lex(file, src)
 	if len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}

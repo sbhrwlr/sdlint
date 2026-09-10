@@ -24,6 +24,7 @@ type Token struct {
 }
 
 type lexer struct {
+	file string
 	src  []byte
 	pos  int
 	line int
@@ -38,13 +39,13 @@ func (l *lexer) next() byte {
 	}
 	b := l.src[l.pos]
 	l.pos++
-	l.col++
+	if b == '\n' {
+		l.line++
+		l.col = 1
+	} else {
+		l.col++
+	}
 	return b
-}
-
-func (l *lexer) nextline() {
-	l.line++
-	l.col = 1
 }
 
 func (l *lexer) emit(kind TokenKind, val string, startPos Position) {
@@ -56,11 +57,10 @@ func (l *lexer) emit(kind TokenKind, val string, startPos Position) {
 	l.toks = append(l.toks, tok)
 }
 
-func (l *lexer) errorf(format string, args ...interface{}) {
-	startPos := l.mark()
-	err := fmt.Errorf(format, args...)
-	l.errs = append(l.errs, err)
-	l.emit(TokError, err.Error(), startPos)
+func (l *lexer) errorf(pos Position, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	l.errs = append(l.errs, fmt.Errorf("%s:%d:%d: %s", l.file, pos.Line, pos.Col, msg))
+	l.emit(TokError, msg, pos)
 }
 
 func (l *lexer) mark() Position {
@@ -110,7 +110,7 @@ func (l *lexer) lexSection(startPos Position) {
 	if closed {
 		l.emit(TokSectionClose, "]", closeStart)
 	} else {
-		l.errorf("unterminated section header")
+		l.errorf(startPos, "unterminated section header")
 	}
 }
 
@@ -119,20 +119,20 @@ func (l *lexer) lexKey(start byte, startPos Position) {
 	l.emit(TokKey, name, startPos)
 
 	l.skipSpaces()
+	eqPos := l.mark()
 	if l.peek() != '=' {
-		l.errorf("expected '=' after key")
+		l.errorf(eqPos, "expected '=' after key")
 		return
 	}
 
-	sepStart := l.mark()
 	l.next()
-	l.emit(TokSep, "=", sepStart)
+	l.emit(TokSep, "=", eqPos)
 
 	l.skipSpaces()
 	valStart := l.mark()
 	val, err := l.scanValue()
 	if err != nil {
-		l.errorf("%s", err)
+		l.errorf(valStart, "%s", err)
 	}
 	l.emit(TokValue, val, valStart)
 }
@@ -168,7 +168,6 @@ func (l *lexer) scanValue() (string, error) {
 		case b == '\n' && len(buf) > 0 && buf[len(buf)-1] == '\\':
 			buf = buf[:len(buf)-1]
 			l.next()
-			l.nextline()
 		case b == '\n':
 			return string(buf), nil
 		default:
@@ -189,7 +188,6 @@ func (l *lexer) run() {
 			return
 		case '\n':
 			l.emit(TokNewline, "\n", startPos)
-			l.nextline()
 		case '#', ';':
 			l.lexComment(b, startPos)
 		case '[':
@@ -208,8 +206,8 @@ func isSpace(b byte) bool {
 }
 
 // Lex tokenizes a unit file's raw bytes.
-func Lex(src []byte) ([]Token, []error) {
-	l := &lexer{src: src, line: 1, col: 1}
+func Lex(file string, src []byte) ([]Token, []error) {
+	l := &lexer{file: file, src: src, line: 1, col: 1}
 	l.run()
 	return l.toks, l.errs
 }
